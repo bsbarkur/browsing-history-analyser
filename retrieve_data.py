@@ -2,16 +2,18 @@ import sys
 import sqlite3
 from urllib2 import HTTPError
 import requests
+import csv
 from bs4 import BeautifulSoup
 
 # Output a big file (csv) or a database where documents
 # are neatly separated, and the following information is available:
 # 1) URL of the document, 2) title of the document.
 
+drows = []
 
 def extract_from_url(url_str):
     url = url_str[1]
-    if url.startswith('http'):
+    if url.startswith('https'):
         print url
     else:
         return
@@ -19,7 +21,7 @@ def extract_from_url(url_str):
     try:
         req = requests.get(url, allow_redirects=False)
         req.encoding = 'utf-8'
-        print str(req.status_code) + ' - ' + str(req.url)
+        # print str(req.status_code) + ' - ' + str(req.url)
 
         if req.status_code is not 200:
             print str(req.url) + ' has a status code of: ' \
@@ -31,16 +33,16 @@ def extract_from_url(url_str):
                 & (req.status_code == requests.codes.ok):
             try:
                 title = unicode(bs_obj.title.string)
-                if url.startswith('http'):
+                if url.startswith('https'):
                     if title is None:
                         title = u'Untitled'
+                    drows.append([title, url])
                     checks = ['script', 'style', 'meta', '<!--']
                     for chk in bs_obj.find_all(checks):
                         chk.extract()
                     body = bs_obj.get_text()
                     body_str = body.strip()
 
-                    print str(req.status_code) + ' - ' + title + ' - Committed.'
 
                 if title is None:
                     title = u'Untitled'
@@ -69,5 +71,15 @@ if __name__ == '__main__':
     rows = cursor.fetchall()
 
     map(extract_from_url, rows)
+
+    with open('documents.csv', 'wb') as csvfile:
+        documentswriter = csv.writer(csvfile, delimiter=',')
+        documentswriter.writerow(["Title", "Url"])
+        for s in drows:
+            stra = unicode(s).encode("ascii", 'ignore')
+            title = str(stra.split(",")[0]).strip("[")
+            url = str(stra.split(",")[1]).strip("]")
+            print title, url
+            documentswriter.writerow([title, url])
 
     db.close()
